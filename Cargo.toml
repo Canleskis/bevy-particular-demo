@@ -1,0 +1,30 @@
+[package]
+name = "bevy-particular-demo"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = "0.8.0"
+bevy_framepace = "0.7.0"
+heron = { version = "4.0.0", features = ["2d"] }
+bevy-inspector-egui = "0.12.1"
+bevy_prototype_lyon = "0.6.0"
+rand = "0.8.5"
+bevy_prototype_debug_lines = "0.8"
+rayon = "1.5.3"
+itertools = "0.10.3"
+glam = "0.21.3"
+particular = "0.1.5"
+bevy_pancam = "0.6.0"
+bevy_mouse_tracking_plugin = "0.3.1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+particular = { version = "0.1.5", features = ["parallel"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
