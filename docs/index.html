@@ -1,0 +1,19 @@
+<html>
+  <head>
+    <title>Particular Demo</title>
+    <style>
+      body,
+      canvas {
+          margin: 0px;
+          padding: 0px;
+      }
+  </style>
+  </head>
+  <script type="module">
+    import init from './wasm_particular-demo.js';
+    async function run(){
+        await init()
+    }
+    run();
+  </script>
+</html>

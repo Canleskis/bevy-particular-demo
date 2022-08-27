@@ -27,21 +27,24 @@ const G: f32 = 1000.0;
 fn main() {
     App::new()
         .insert_resource(WindowDescriptor {
-            title: "I am a window!".to_string(),
-            // width: 1500.0,
-            // height: 900.0,
+            title: "Particular demo".to_string(),
+            #[cfg(not(target_arch = "wasm32"))]
+            width: 1500.0,
+            #[cfg(not(target_arch = "wasm32"))]
+            height: 900.0,
             present_mode: PresentMode::AutoNoVsync,
+            fit_canvas_to_parent: true,
             ..default()
         })
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(PhysicsSteps::from_steps_per_seconds(60.0))
+        .add_plugins(DefaultPlugins)
         .add_plugin(LogDiagnosticsPlugin {
             wait_duration: Duration::from_secs_f32(1.0),
             ..default()
         })
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         // .add_plugin(WorldInspectorPlugin::new())
-        .add_plugins(DefaultPlugins)
         .add_plugin(ShapePlugin)
         .add_plugin(PanCamPlugin::default())
         .add_plugin(MousePosPlugin::SingleCamera)
@@ -73,7 +76,7 @@ fn spawn_random_bodies(mut commands: Commands) {
     commands.spawn_bundle(BodyBundle::new(
         Vec3::ZERO,
         Velocity::from_linear(Vec3::ZERO),
-        10.0,
+        25.0,
         INFINITY,
         PointMass::HasGravity { mass: big_mass },
     ));
@@ -94,16 +97,13 @@ fn spawn_random_bodies(mut commands: Commands) {
 
         let velvec = Vec3::new(-direction.y * vel, direction.x * vel, 0.0);
 
-        commands
-            .spawn_bundle(BodyBundle::new(
-                pos,
-                Velocity::from_linear(velvec),
-                2.0,
-                1.0,
-                PointMass::HasGravity { mass: small_mass },
-            ))
-            // .insert(DrawTrail::new(20.0, 1))
-            ;
+        commands.spawn_bundle(BodyBundle::new(
+            pos,
+            Velocity::from_linear(velvec),
+            2.0,
+            1.0,
+            PointMass::HasGravity { mass: small_mass },
+        ));
     }
 }
 
@@ -192,7 +192,7 @@ impl BodyBundle {
             material: PhysicMaterial {
                 restitution: 0.0,
                 density,
-                friction: 0.0,
+                friction: 0.5,
             },
             rigidbody: RigidBody::Dynamic,
             velocity,
