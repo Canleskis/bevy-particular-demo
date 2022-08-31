@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = "0.8.0"
+bevy = "0.8.1"
 bevy_framepace = "0.7.0"
 heron = { version = "4.0.0", features = ["2d"] }
 bevy-inspector-egui = "0.12.1"
@@ -17,8 +17,9 @@ rayon = "1.5.3"
 itertools = "0.10.3"
 glam = "0.21.3"
 particular = "0.1.5"
-bevy_pancam = "0.6.0"
+bevy_pancam = { version = "0.6.0", features = ["bevy_egui"] }
 bevy_mouse_tracking_plugin = "0.3.1"
+bevy_egui = "0.16"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 particular = { version = "0.1.5", features = ["parallel"] }
