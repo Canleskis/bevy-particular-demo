@@ -5,11 +5,12 @@ mod trails;
 use std::f32::consts::{PI, TAU};
 use std::time::Duration;
 
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
+use bevy::diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::ecs::system::EntityCommands;
 use bevy::input::mouse::MouseButtonInput;
 use bevy::input::ButtonState;
 use bevy::scene::SceneInstance;
+use bevy::time::FixedTimestep;
 use bevy::{prelude::*, window::PresentMode};
 use bevy_egui::egui::{ComboBox, Slider};
 use bevy_egui::{egui, EguiContext, EguiPlugin};
@@ -59,6 +60,8 @@ fn main() {
         .add_state(SimulationState::Running)
         .add_state(SceneState::Instancing)
         .add_startup_system(spawn_camera)
+        .add_startup_system(setup_ui_fps)
+        .add_system(update_ui_fps.with_run_criteria(FixedTimestep::step(0.2)))
         .add_system(place_body)
         .add_system(body_info_window)
         .add_system(sim_info_window)
@@ -68,6 +71,51 @@ fn main() {
         .add_system_set(SystemSet::on_exit(SimulationState::Paused).with_system(resume_physics))
         .add_system(pause_resume)
         .run();
+}
+
+#[derive(Component)]
+struct FpsText;
+
+fn setup_ui_fps(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands
+        .spawn_bundle(
+            TextBundle::from_sections([
+                TextSection::new(
+                    "FPS: ",
+                    TextStyle {
+                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                        font_size: 20.0,
+                        color: Color::GRAY,
+                    },
+                ),
+                TextSection::from_style(TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 20.0,
+                    color: Color::GRAY,
+                }),
+            ])
+            .with_style(Style {
+                position_type: PositionType::Absolute,
+                position: UiRect {
+                    top: Val::Px(5.0),
+                    right: Val::Px(10.0),
+                    ..default()
+                },
+                ..default()
+            }),
+        )
+        .insert(FpsText);
+}
+
+fn update_ui_fps(mut query_text: Query<&mut Text, With<FpsText>>, diagnostic: Res<Diagnostics>) {
+    let fps = diagnostic
+        .get(FrameTimeDiagnosticsPlugin::FPS)
+        .and_then(|fps| fps.average());
+    if let Some(fps) = fps {
+        for mut text in &mut query_text {
+            text.sections[1].value = format!("{fps:.0}");
+        }
+    }
 }
 
 fn spawn_camera(mut commands: Commands) {
@@ -112,7 +160,11 @@ impl Default for BodyInfo {
     }
 }
 
-fn body_info_window(mut egui_ctx: ResMut<EguiContext>, mut body_info: ResMut<BodyInfo>, scene: Res<SimulationScene>) {
+fn body_info_window(
+    mut egui_ctx: ResMut<EguiContext>,
+    mut body_info: ResMut<BodyInfo>,
+    scene: Res<SimulationScene>,
+) {
     egui::Window::new("Body info").show(egui_ctx.ctx_mut(), |ui| {
         let max_mass = scene.max_spawnable_mass();
         ui.add(
@@ -303,7 +355,7 @@ impl Default for OrbitsInfo {
         Self {
             main_mass: 1E5,
             main_density: 20.0,
-            bodies_count: 1000,
+            bodies_count: 800,
             bodies_density: 0.1,
             bodies_range_pos: 1000.0,
             bodies_range_mass: 10.0,
