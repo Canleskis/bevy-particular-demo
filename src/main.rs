@@ -6,13 +6,14 @@ use std::f32::consts::{PI, TAU};
 use std::time::Duration;
 
 use bevy::diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
+use bevy::ecs::schedule::ShouldRun;
 use bevy::ecs::system::EntityCommands;
 use bevy::input::mouse::MouseButtonInput;
 use bevy::input::ButtonState;
 use bevy::scene::SceneInstance;
 use bevy::time::FixedTimestep;
 use bevy::{prelude::*, window::PresentMode};
-use bevy_egui::egui::{ComboBox, Slider};
+use bevy_egui::egui::{ComboBox, Layout, Slider};
 use bevy_egui::{egui, EguiContext, EguiPlugin};
 use bevy_mouse_tracking_plugin::{MousePosPlugin, MousePosWorld};
 use bevy_pancam::{PanCam, PanCamPlugin};
@@ -55,18 +56,16 @@ fn main() {
         .add_plugin(PhysicsPlugin::default())
         .add_plugin(TrailsPlugin)
         .add_plugin(ParticularPlugin)
-        .insert_resource(SimulationScene::Orbits(OrbitsInfo::default()))
+        .init_resource::<SimulationScene>()
         .init_resource::<BodyInfo>()
         .add_state(SimulationState::Running)
-        .add_state(SceneState::Instancing)
         .add_startup_system(spawn_camera)
         .add_startup_system(setup_ui_fps)
         .add_system(update_ui_fps.with_run_criteria(FixedTimestep::step(0.2)))
         .add_system(place_body)
         .add_system(body_info_window)
         .add_system(sim_info_window)
-        .add_system_set(SystemSet::on_enter(SceneState::Instancing).with_system(instance_scene))
-        .add_system_set(SystemSet::on_exit(SceneState::Instanced).with_system(cleanup_scene))
+        .add_system(scene_cleanup_and_reinstance.with_run_criteria(scene_changed))
         .add_system_set(SystemSet::on_enter(SimulationState::Paused).with_system(pause_physics))
         .add_system_set(SystemSet::on_exit(SimulationState::Paused).with_system(resume_physics))
         .add_system(pause_resume)
@@ -208,6 +207,7 @@ fn place_body(
                                 PointMass::HasGravity {
                                     mass: body_info.mass,
                                 },
+                                Color::WHITE,
                             ));
 
                             if body_info.trail {
@@ -232,18 +232,12 @@ fn place_body(
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-enum SceneState {
-    Instancing,
-    Instanced,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum SimulationState {
     Running,
     Paused,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 enum SimulationScene {
     Empty,
     Orbits(OrbitsInfo),
@@ -264,10 +258,53 @@ impl std::fmt::Display for SimulationScene {
     }
 }
 
+#[allow(clippy::single_match)]
 impl SimulationScene {
+    fn show_ui(&mut self, ui: &mut egui::Ui) {
+        let min_pos = self.min_spawnable_position();
+        let max_mass = self.max_spawnable_mass();
+
+        match self {
+            SimulationScene::Orbits(info) => {
+                ui.separator();
+
+                ui.label("Central body:");
+                {
+                    ui.add(
+                        Slider::new(&mut info.main_mass, 1E3..=1E6)
+                            .logarithmic(true)
+                            .text("Mass"),
+                    );
+                }
+
+                ui.separator();
+
+                ui.label("Orbiting bodies:");
+                {
+                    ui.add(
+                        Slider::new(&mut info.bodies_count, 1..=5000)
+                            .text("Body count")
+                            .logarithmic(true),
+                    );
+
+                    ui.add(
+                        Slider::new(&mut info.bodies_range_pos, min_pos..=10000.0)
+                            .text("Position range")
+                            .logarithmic(true)
+                            .integer(),
+                    );
+
+                    ui.add(
+                        Slider::new(&mut info.bodies_range_mass, 0.0..=max_mass).text("Mass range"),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn instance(&self, mut scene_commands: EntityCommands) {
         match self {
-            Self::Empty => {}
             Self::Orbits(info) => {
                 let mut rng = thread_rng();
 
@@ -280,6 +317,7 @@ impl SimulationScene {
                         PointMass::HasGravity {
                             mass: info.main_mass,
                         },
+                        Color::WHITE,
                     ));
 
                     let min_radius = 2.0 * self.main_radius();
@@ -300,6 +338,9 @@ impl SimulationScene {
                         let vel = (G * (info.main_mass + mass)).sqrt() * distance.powf(-0.75);
                         let velvec = Vec3::new(-direction.y * vel, direction.x * vel, 0.0);
 
+                        let mut random_color = || rng.gen_range(0.0..=1.0_f32);
+                        let (r, g, b) = (random_color(), random_color(), random_color());
+
                         child
                             .spawn_bundle(BodyBundle::new(
                                 position,
@@ -307,35 +348,36 @@ impl SimulationScene {
                                 info.bodies_density,
                                 mass.max(1.0),
                                 PointMass::HasGravity { mass },
+                                Color::rgb(r, g, b),
                             ))
                             .insert(Name::new(format!("Particle {}", i)));
                     }
                 });
             }
+            _ => {}
         }
     }
 
     fn main_radius(&self) -> f32 {
-        if let SimulationScene::Orbits(info) = self {
-            (info.main_mass / (info.main_density * PI)).sqrt()
-        } else {
-            0.0
+        match self {
+            SimulationScene::Orbits(info) => (info.main_mass / (info.main_density * PI)).sqrt(),
+            _ => 0.0,
         }
     }
 
     fn max_spawnable_mass(&self) -> f32 {
-        if let SimulationScene::Orbits(info) = self {
-            info.main_mass / 5E3
-        } else {
-            1E4
+        match self {
+            SimulationScene::Orbits(info) => info.main_mass / 5E3,
+            _ => 100.0,
         }
     }
 
     fn min_spawnable_position(&self) -> f32 {
-        if let SimulationScene::Orbits(info) = self {
-            ((info.bodies_count as f32).sqrt() * 10.0).max(self.main_radius() * 4.0)
-        } else {
-            0.0
+        match self {
+            SimulationScene::Orbits(info) => ((info.bodies_count as f32).sqrt()
+                * info.bodies_range_mass)
+                .max(self.main_radius() * 4.0),
+            _ => 0.0,
         }
     }
 }
@@ -355,7 +397,7 @@ impl Default for OrbitsInfo {
         Self {
             main_mass: 1E5,
             main_density: 20.0,
-            bodies_count: 800,
+            bodies_count: 1000,
             bodies_density: 0.1,
             bodies_range_pos: 1000.0,
             bodies_range_mass: 10.0,
@@ -365,82 +407,56 @@ impl Default for OrbitsInfo {
 
 fn sim_info_window(
     mut egui_ctx: ResMut<EguiContext>,
-    mut scene_state: ResMut<State<SceneState>>,
     mut scene: ResMut<SimulationScene>,
+    mut current: Local<Option<SimulationScene>>,
     mut cached: Local<OrbitsInfo>,
 ) {
-    egui::Window::new("Simulation").show(egui_ctx.ctx_mut(), |ui| {
-        ComboBox::from_id_source("")
-            .selected_text(format!("{}", *scene))
-            .show_ui(ui, |ui| {
-                if ui
-                    .selectable_value(scene.as_mut(), SimulationScene::Orbits(*cached), "Orbits")
-                    .clicked()
-                    || ui
-                        .selectable_value(scene.as_mut(), SimulationScene::Empty, "Empty")
-                        .clicked()
-                {
-                    scene_state.set(SceneState::Instancing).unwrap();
-                };
+    if let Some(current) = current.as_mut() {
+        egui::Window::new("Simulation").show(egui_ctx.ctx_mut(), |ui| {
+            ui.with_layout(Layout::left_to_right(egui::Align::Min), |ui| {
+                ComboBox::from_label("")
+                    .selected_text(current.to_string())
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(current, SimulationScene::Orbits(*cached), "Orbits");
+                        ui.selectable_value(current, SimulationScene::Empty, "Empty");
+                    });
+
+                if ui.button("New").clicked() {
+                    *scene = current.clone();
+                }
             });
 
-        let min_pos = scene.min_spawnable_position();
-        let max_mass = scene.max_spawnable_mass();
+            current.show_ui(ui);
 
-        if let SimulationScene::Orbits(info) = scene.as_mut() {
-            ui.separator();
-
-            ui.label("Central body:");
-            {
-                ui.add(
-                    Slider::new(&mut info.main_mass, 1E3..=1E6)
-                        .logarithmic(true)
-                        .text("Mass"),
-                );
+            if let SimulationScene::Orbits(info) = *current {
+                *cached = info;
             }
-
-            ui.separator();
-
-            ui.label("Orbiting bodies:");
-            {
-                ui.add(
-                    Slider::new(&mut info.bodies_count, 1..=20000)
-                        .text("Body count")
-                        .logarithmic(true),
-                );
-
-                ui.add(
-                    Slider::new(&mut info.bodies_range_pos, min_pos..=10000.0)
-                        .text("Position range")
-                        .logarithmic(true)
-                        .integer(),
-                );
-
-                ui.add(Slider::new(&mut info.bodies_range_mass, 0.0..=max_mass).text("Mass range"));
-            }
-
-            *cached = *info;
-        }
-    });
+        });
+    } else {
+        *current = Some(scene.clone())
+    }
 }
 
-fn cleanup_scene(mut commands: Commands, scene_query: Query<Entity, With<SceneInstance>>) {
-    commands.entity(scene_query.single()).despawn_descendants();
+fn scene_changed(scene: Res<SimulationScene>) -> ShouldRun {
+    if scene.is_changed() {
+        ShouldRun::Yes
+    } else {
+        ShouldRun::No
+    }
 }
 
-fn instance_scene(
+fn scene_cleanup_and_reinstance(
     mut commands: Commands,
-    mut scene_state: ResMut<State<SceneState>>,
     scene: Res<SimulationScene>,
     scene_query: Query<Entity, With<SceneInstance>>,
 ) {
-    let scene_commands = match scene_query.get_single() {
+    let mut scene_commands = match scene_query.get_single() {
         Ok(scene) => commands.entity(scene),
         Err(_) => commands.spawn_bundle(SceneBundle { ..default() }),
     };
 
+    scene_commands.despawn_descendants();
     scene.instance(scene_commands);
-    scene_state.overwrite_set(SceneState::Instanced).unwrap();
 }
 
 #[derive(Bundle)]
@@ -462,6 +478,7 @@ impl BodyBundle {
         density: f32,
         mass: f32,
         point_mass: PointMass,
+        color: Color,
     ) -> Self {
         let radius = (mass / (density * PI)).sqrt();
         Self {
@@ -470,7 +487,7 @@ impl BodyBundle {
                     radius,
                     center: Vec2::ZERO,
                 },
-                DrawMode::Fill(FillMode::color(Color::WHITE)),
+                DrawMode::Fill(FillMode::color(color)),
                 Transform::from_translation(position),
             ),
             collider: CollisionShape::Sphere { radius },
