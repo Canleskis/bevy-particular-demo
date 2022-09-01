@@ -2,18 +2,15 @@
   <head>
     <title>Particular Demo</title>
     <style>
-      body,
-      canvas {
-          margin: 0px;
-          padding: 0px;
+      body {
+        width:  100%;
+        height: 100%;
+        margin: 0;
       }
   </style>
   </head>
   <script type="module">
     import init from './wasm_particular-demo.js';
-    async function run(){
-        await init()
-    }
-    run();
+    init()
   </script>
 </html>
