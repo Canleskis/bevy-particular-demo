@@ -18,12 +18,12 @@ impl Plugin for TrailsPlugin {
 }
 
 #[derive(Component, Inspectable)]
-pub struct DrawTrail {
+pub struct Trail {
     pub length: f32,
     pub resolution: usize,
 }
 
-impl DrawTrail {
+impl Trail {
     pub fn new(length: f32, resolution: usize) -> Self {
         Self { length, resolution }
     }
@@ -33,7 +33,7 @@ fn draw_trails(
     integration: Res<IntegrationParameters>,
     mut lines: ResMut<DebugLines>,
     mut last_positions_and_iterations: Local<HashMap<u32, (Vec3, usize)>>,
-    query: Query<(Entity, &GlobalTransform, &DrawTrail)>,
+    query: Query<(Entity, &GlobalTransform, &Trail)>,
 ) {
     for (entity, transform, draw_trail) in query.iter() {
         if let Some((last_position, last_iteration)) =
