@@ -15,7 +15,6 @@ rand = "0.8.5"
 bevy_prototype_debug_lines = "0.8"
 rayon = "1.5.3"
 itertools = "0.10.3"
-glam = "0.21.3"
 particular = "0.1.5"
 bevy_pancam = { version = "0.6.0", features = ["bevy_egui"] }
 bevy_mouse_tracking_plugin = "0.3.1"
