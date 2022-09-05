@@ -3,7 +3,7 @@ mod scene_data;
 mod systems;
 
 pub use loaded_scene::LoadedScene;
-pub use scene_data::{SceneData, SimulationScene};
+pub use scene_data::{Empty, SceneData, SimulationScene};
 
 use bevy::{
     app::{App, Plugin},
@@ -12,25 +12,39 @@ use bevy::{
 
 pub type SceneCollection = Vec<SimulationScene>;
 
-pub struct SimulationScenePlugin {
-    scenes: SceneCollection,
+pub trait AddScene {
+    fn with<S>(self, scene: S) -> Self
+    where
+        S: SceneData + Send + Sync + 'static;
+
+    fn add<S>(&mut self, scene: S)
+    where
+        S: SceneData + Send + Sync + 'static;
 }
 
-impl SimulationScenePlugin {
-    pub fn new(scenes: SceneCollection) -> Self {
-        Self { scenes }
+impl AddScene for SceneCollection {
+    fn with<S>(mut self, scene: S) -> Self
+    where
+        S: SceneData + Send + Sync + 'static,
+    {
+        self.push(Box::new(scene));
+        self
+    }
+
+    fn add<S>(&mut self, scene: S)
+    where
+        S: SceneData + Send + Sync + 'static,
+    {
+        self.push(Box::new(scene));
     }
 }
 
+pub struct SimulationScenePlugin;
+
 impl Plugin for SimulationScenePlugin {
     fn build(&self, app: &mut App) {
-        let scenes = self.scenes.clone();
-        let loaded = scenes.first().expect("Missing scenes!").clone();
-
-        app.insert_resource(scenes)
-            .insert_resource(LoadedScene::new(loaded))
-            .add_system(
-                systems::scene_cleanup_and_reload.with_run_criteria(systems::scene_changed),
-            );
+        app.insert_resource(LoadedScene::new(Empty {})).add_system(
+            systems::scene_cleanup_and_reload.with_run_criteria(systems::scene_changed),
+        );
     }
 }

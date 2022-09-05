@@ -6,6 +6,11 @@ mod trails;
 use std::f32::consts::PI;
 use std::time::Duration;
 
+use nbody::{ParticularPlugin, PointMass};
+use simulation_scene::*;
+use simulation_scenes::Orbits;
+use trails::{Trail, TrailsPlugin};
+
 use bevy::diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::input::mouse::MouseButtonInput;
 use bevy::input::ButtonState;
@@ -23,11 +28,6 @@ use bevy_prototype_lyon::prelude::*;
 use bevy_prototype_lyon::shapes::Circle;
 use heron::{prelude::*, PhysicsSteps};
 
-use nbody::{ParticularPlugin, PointMass};
-use simulation_scene::*;
-use simulation_scenes::{Empty, Orbits};
-use trails::{Trail, TrailsPlugin};
-
 const G: f32 = 1000.0;
 
 fn main() {
@@ -42,25 +42,24 @@ fn main() {
             fit_canvas_to_parent: true,
             ..default()
         })
-        .insert_resource(ClearColor(Color::BLACK))
-        .insert_resource(PhysicsSteps::from_steps_per_seconds(60.0))
         .add_plugins(DefaultPlugins)
         .add_plugin(LogDiagnosticsPlugin {
             wait_duration: Duration::from_secs_f32(1.0),
             ..default()
         })
-        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_plugin(FrameTimeDiagnosticsPlugin)
         .add_plugin(ShapePlugin)
         .add_plugin(EguiPlugin)
-        .add_plugin(PanCamPlugin::default())
+        .add_plugin(PanCamPlugin)
         .add_plugin(MousePosPlugin::SingleCamera)
         .add_plugin(PhysicsPlugin::default())
         .add_plugin(TrailsPlugin)
         .add_plugin(ParticularPlugin)
-        .add_plugin(SimulationScenePlugin::new(vec![
-            Box::new(Orbits::default()),
-            Box::new(Empty {}),
-        ]))
+        .add_plugin(SimulationScenePlugin)
+        .insert_resource(ClearColor(Color::BLACK))
+        .insert_resource(PhysicsSteps::from_steps_per_seconds(60.0))
+        .insert_resource(SceneCollection::new().with(Orbits::default()).with(Empty))
+        .insert_resource(LoadedScene::new(Orbits::default()))
         .init_resource::<BodyInfo>()
         .add_state(SimulationState::Running)
         .add_startup_system(spawn_camera)
@@ -73,6 +72,12 @@ fn main() {
         .add_system_set(SystemSet::on_exit(SimulationState::Paused).with_system(resume_physics))
         .add_system(pause_resume)
         .run();
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+enum SimulationState {
+    Running,
+    Paused,
 }
 
 #[derive(Component)]
@@ -231,12 +236,6 @@ fn place_body(
             Color::rgb(scale, 1.0 - scale, 0.0),
         )
     }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-enum SimulationState {
-    Running,
-    Paused,
 }
 
 fn sim_info_window(

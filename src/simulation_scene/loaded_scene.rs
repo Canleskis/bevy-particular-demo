@@ -1,4 +1,4 @@
-use crate::SimulationScene;
+use crate::{SceneData, SimulationScene};
 use bevy::ecs::{entity::Entity, system::EntityCommands};
 
 pub struct LoadedScene {
@@ -7,9 +7,12 @@ pub struct LoadedScene {
 }
 
 impl LoadedScene {
-    pub fn new(scene: SimulationScene) -> Self {
+    pub fn new<S>(scene: S) -> Self
+    where
+        S: SceneData + Send + Sync + 'static,
+    {
         Self {
-            scene,
+            scene: Box::new(scene),
             entity: None,
         }
     }
@@ -18,12 +21,17 @@ impl LoadedScene {
         self.scene = scene;
     }
 
-    pub(crate) fn spawned(&mut self, entity: Entity) {
-        self.entity = Some(entity);
+    pub fn spawned(&mut self, entity: Entity) {
+        self.entity.get_or_insert(entity);
+    }
+
+    pub fn despawned(&mut self) {
+        self.entity = None;
     }
 
     pub fn entity(&self) -> Entity {
-        self.entity.expect("No entity for {self.scene}")
+        self.entity
+            .unwrap_or_else(|| panic!("No entity for {}", self.scene))
     }
 
     pub fn get_entity(&self) -> Option<Entity> {

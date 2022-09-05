@@ -20,16 +20,6 @@ pub struct Orbits {
     bodies_range_mass: f32,
 }
 
-impl Orbits {
-    fn main_radius(&self) -> f32 {
-        (self.main_mass / (self.main_density * PI)).sqrt()
-    }
-
-    fn min_spawnable_position(&self) -> f32 {
-        ((self.bodies_count as f32).sqrt() * self.bodies_range_mass).max(self.main_radius() * 4.0)
-    }
-}
-
 impl Default for Orbits {
     fn default() -> Self {
         Self {
@@ -40,6 +30,16 @@ impl Default for Orbits {
             bodies_range_pos: 1000.0,
             bodies_range_mass: 10.0,
         }
+    }
+}
+
+impl Orbits {
+    fn main_radius(&self) -> f32 {
+        (self.main_mass / (self.main_density * PI)).sqrt()
+    }
+
+    fn min_spawnable_position(&self) -> f32 {
+        ((self.bodies_count as f32).sqrt() * self.bodies_range_mass).max(self.main_radius() * 4.0)
     }
 }
 
@@ -137,24 +137,5 @@ impl SceneData for Orbits {
 
     fn max_spawnable_mass(&self) -> f32 {
         self.main_mass / 5E3
-    }
-}
-
-#[derive(Clone)]
-pub struct Empty {}
-
-impl Display for Empty {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Empty")
-    }
-}
-
-impl SceneData for Empty {
-    fn instance(&self, _: EntityCommands) {}
-
-    fn show_ui(&mut self, _: &mut Ui) {}
-
-    fn max_spawnable_mass(&self) -> f32 {
-        100.0
     }
 }
