@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use nbody::{ParticularPlugin, PointMass};
 use simulation_scene::*;
-use simulation_scenes::Orbits;
+use simulation_scenes::{DoubleOval, Figure8, Orbits, TernaryOrbit};
 use trails::{Trail, TrailsPlugin};
 
 use bevy::diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
@@ -58,7 +58,14 @@ fn main() {
         .add_plugin(SimulationScenePlugin)
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(PhysicsSteps::from_steps_per_seconds(60.0))
-        .insert_resource(SceneCollection::new().with(Orbits::default()).with(Empty))
+        .insert_resource(
+            SceneCollection::new()
+                .with_scene::<Empty>()
+                .with_scene::<Orbits>()
+                .with_scene::<Figure8>()
+                .with_scene::<DoubleOval>()
+                .with_scene::<TernaryOrbit>(),
+        )
         .insert_resource(LoadedScene::new(Orbits::default()))
         .init_resource::<BodyInfo>()
         .add_state(SimulationState::Running)
@@ -174,11 +181,7 @@ fn body_info_window(
 ) {
     Window::new("Body spawner").show(egui_ctx.ctx_mut(), |ui| {
         let max_mass = scene.max_spawnable_mass();
-        ui.add(
-            Slider::new(&mut body_info.mass, 1.0..=max_mass)
-                .text("Mass")
-                .logarithmic(true),
-        );
+        ui.add(Slider::new(&mut body_info.mass, 0.0..=max_mass).text("Mass"));
 
         ui.checkbox(&mut body_info.trail, "Draw trail");
     });
@@ -204,13 +207,13 @@ fn place_body(
                 ButtonState::Pressed => body_info.position = Some(mouse_pos),
                 ButtonState::Released => {
                     if let Some(place_pos) = body_info.position.take() {
-                        let mut scene = commands.entity(scene.entity());
-                        scene.with_children(|child| {
+                        let mut entity = commands.entity(scene.entity());
+                        entity.with_children(|child| {
                             let mut entity = child.spawn_bundle(BodyBundle::new(
                                 place_pos,
                                 Velocity::from_linear(place_pos - mouse_pos),
                                 0.1,
-                                body_info.mass,
+                                body_info.mass.max(1.0),
                                 PointMass::HasGravity {
                                     mass: body_info.mass,
                                 },
@@ -242,21 +245,25 @@ fn sim_info_window(
     mut egui_ctx: ResMut<EguiContext>,
     mut scenes: ResMut<SceneCollection>,
     mut scene: ResMut<LoadedScene>,
-    mut selected: Local<usize>,
+    mut selected: Local<Option<usize>>,
 ) {
-    Window::new("Simulation").show(egui_ctx.ctx_mut(), |ui| {
-        ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
-            ComboBox::from_label("")
-                .show_index(ui, &mut selected, scenes.len(), |i| scenes[i].to_string());
+    if let Some(selected) = selected.as_mut() {
+        Window::new("Simulation").show(egui_ctx.ctx_mut(), |ui| {
+            ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
+                ComboBox::from_label("")
+                    .show_index(ui, selected, scenes.len(), |i| scenes[i].to_string());
 
-            if ui.button("New").clicked() {
-                let selected_scene = scenes[*selected].clone();
-                scene.load(selected_scene);
-            }
+                if ui.button("New").clicked() {
+                    let selected_scene = scenes[*selected].clone();
+                    scene.load(selected_scene);
+                }
+            });
+
+            scenes[*selected].show_ui(ui);
         });
-
-        scenes[*selected].show_ui(ui);
-    });
+    } else {
+        *selected = scenes.iter().position(|s| s == scene.loaded());
+    }
 }
 
 #[derive(Bundle)]

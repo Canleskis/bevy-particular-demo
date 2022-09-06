@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use bevy::ecs::system::EntityCommands;
 use bevy_egui::egui::Ui;
 
@@ -13,7 +15,7 @@ impl<T: 'static + SceneData + Send + Sync + Clone> SceneDataClone for T {
     }
 }
 
-pub trait SceneData: SceneDataClone + std::fmt::Display {
+pub trait SceneData: SceneDataClone + Display {
     fn instance(&self, scene_commands: EntityCommands);
 
     fn show_ui(&mut self, ui: &mut Ui);
@@ -27,10 +29,16 @@ impl Clone for SimulationScene {
     }
 }
 
-#[derive(Clone)]
+impl PartialEq for SimulationScene {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string() == other.to_string()
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct Empty;
 
-impl std::fmt::Display for Empty {
+impl Display for Empty {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Empty")
     }

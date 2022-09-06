@@ -21,6 +21,10 @@ impl LoadedScene {
         self.scene = scene;
     }
 
+    pub fn loaded(&mut self) -> &SimulationScene {
+        &self.scene
+    }
+
     pub fn spawned(&mut self, entity: Entity) {
         self.entity.get_or_insert(entity);
     }
