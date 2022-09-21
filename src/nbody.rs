@@ -4,13 +4,13 @@ use heron::{should_run, Acceleration};
 use particular::prelude::*;
 
 pub struct Body {
-    position: Vec3,
+    position: Vec2,
     mu: f32,
     entity: Entity,
 }
 
 impl Body {
-    pub fn new(position: Vec3, mu: f32, entity: Entity) -> Self {
+    pub fn new(position: Vec2, mu: f32, entity: Entity) -> Self {
         Self {
             position,
             mu,
@@ -20,7 +20,9 @@ impl Body {
 }
 
 impl Particle for Body {
-    fn position(&self) -> Vec3 {
+    type Vector = Vec2;
+
+    fn position(&self) -> Vec2 {
         self.position
     }
 
@@ -32,7 +34,7 @@ impl Particle for Body {
 #[derive(Component)]
 pub enum PointMass {
     HasGravity { mass: f32 },
-    AffectedByGravity,
+    _AffectedByGravity,
 }
 
 pub struct ParticularPlugin;
@@ -61,11 +63,16 @@ fn sync_particle_set(
 ) {
     *particle_set = ParticleSet::new();
     query.for_each(|(entity, tranform, point_mass)| {
-        let mu = match point_mass {
-            PointMass::HasGravity { mass } => *mass * G,
-            PointMass::AffectedByGravity => 0.0,
+        match point_mass {
+            PointMass::HasGravity { mass } => particle_set.add_massive(Body::new(
+                tranform.translation().truncate(),
+                mass * G,
+                entity,
+            )),
+            PointMass::_AffectedByGravity => {
+                particle_set.add_massless(Body::new(tranform.translation().truncate(), 0.0, entity))
+            }
         };
-        particle_set.add(Body::new(tranform.translation(), mu, entity));
     })
 }
 
@@ -75,7 +82,7 @@ fn accelerate_particles(
 ) {
     for (body, gravity) in particle_set.result() {
         if let Ok(mut acceleration) = query.get_mut(body.entity) {
-            acceleration.linear = gravity;
+            acceleration.linear = gravity.extend(0.0);
         }
     }
 }

@@ -29,7 +29,7 @@ impl LoadedScene {
         self.entity.get_or_insert(entity);
     }
 
-    pub fn despawned(&mut self) {
+    pub fn _despawned(&mut self) {
         self.entity = None;
     }
 
