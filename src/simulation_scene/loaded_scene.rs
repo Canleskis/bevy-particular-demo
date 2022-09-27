@@ -1,6 +1,8 @@
 use crate::{SceneData, SimulationScene};
 use bevy::ecs::{entity::Entity, system::EntityCommands};
 
+use crate::Spawnable;
+
 pub struct LoadedScene {
     scene: SimulationScene,
     entity: Option<Entity>,
@@ -46,7 +48,7 @@ impl LoadedScene {
         self.scene.instance(scene_commands)
     }
 
-    pub fn max_spawnable_mass(&self) -> f32 {
-        self.scene.max_spawnable_mass()
+    pub fn spawnable(&self) -> Spawnable {
+        self.scene.spawnable()
     }
 }

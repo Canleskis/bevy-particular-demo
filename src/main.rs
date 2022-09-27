@@ -6,6 +6,7 @@ mod trails;
 use std::f32::consts::PI;
 use std::time::Duration;
 
+use bevy_egui::egui;
 use nbody::{ParticularPlugin, PointMass};
 use simulation_scene::*;
 use simulation_scenes::{DoubleOval, Figure8, Orbits, TernaryOrbit};
@@ -17,7 +18,7 @@ use bevy::input::ButtonState;
 use bevy::time::FixedTimestep;
 use bevy::{prelude::*, window::PresentMode};
 use bevy_egui::{
-    egui::{Align, ComboBox, Layout, Slider, Window},
+    egui::{Slider, Window},
     EguiContext, EguiPlugin,
 };
 use bevy_mouse_tracking_plugin::{MousePosPlugin, MousePosWorld};
@@ -74,17 +75,19 @@ fn main() {
         .add_system(update_ui_fps.with_run_criteria(FixedTimestep::step(0.25)))
         .add_system(place_body)
         .add_system(body_info_window)
-        .add_system(sim_info_window)
         .add_system_set(SystemSet::on_enter(SimulationState::Paused).with_system(pause_physics))
         .add_system_set(SystemSet::on_exit(SimulationState::Paused).with_system(resume_physics))
         .add_system(pause_resume)
         .run();
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-enum SimulationState {
-    Running,
-    Paused,
+fn spawn_camera(mut commands: Commands) {
+    commands
+        .spawn_bundle(Camera2dBundle::default())
+        .insert(PanCam {
+            grab_buttons: vec![MouseButton::Right, MouseButton::Middle],
+            ..default()
+        });
 }
 
 #[derive(Component)]
@@ -132,13 +135,10 @@ fn update_ui_fps(mut query_text: Query<&mut Text, With<FpsText>>, diagnostic: Re
     }
 }
 
-fn spawn_camera(mut commands: Commands) {
-    commands
-        .spawn_bundle(Camera2dBundle::default())
-        .insert(PanCam {
-            grab_buttons: vec![MouseButton::Right, MouseButton::Middle],
-            ..default()
-        });
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+enum SimulationState {
+    Running,
+    Paused,
 }
 
 fn pause_resume(keys: Res<Input<KeyCode>>, mut state: ResMut<State<SimulationState>>) {
@@ -161,7 +161,8 @@ fn resume_physics(mut physics: ResMut<PhysicsTime>) {
 struct BodyInfo {
     position: Option<Vec3>,
     mass: f32,
-    trail: bool,
+    with_mass: bool,
+    with_trail: bool,
 }
 
 impl Default for BodyInfo {
@@ -169,7 +170,8 @@ impl Default for BodyInfo {
         Self {
             position: None,
             mass: 20.0,
-            trail: false,
+            with_mass: true,
+            with_trail: false,
         }
     }
 }
@@ -180,10 +182,18 @@ fn body_info_window(
     scene: Res<LoadedScene>,
 ) {
     Window::new("Body spawner").show(egui_ctx.ctx_mut(), |ui| {
-        let max_mass = scene.max_spawnable_mass();
-        ui.add(Slider::new(&mut body_info.mass, 0.0..=max_mass).text("Mass"));
+        ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+            if let Some((min_mass, max_mass)) = scene.spawnable().mass_range() {
+                ui.add_enabled(
+                    body_info.with_mass,
+                    Slider::new(&mut body_info.mass, min_mass..=max_mass),
+                );
 
-        ui.checkbox(&mut body_info.trail, "Draw trail");
+                ui.toggle_value(&mut body_info.with_mass, "Mass");
+            }
+        });
+
+        ui.checkbox(&mut body_info.with_trail, "Draw trail");
     });
 
     if egui_ctx.ctx_mut().wants_pointer_input() {
@@ -207,20 +217,36 @@ fn place_body(
                 ButtonState::Pressed => body_info.position = Some(mouse_pos),
                 ButtonState::Released => {
                     if let Some(place_pos) = body_info.position.take() {
+                        let spawnable = scene.spawnable();
+                        let (density, physics_mass, point_mass) = if spawnable.is_massive() {
+                            if body_info.with_mass {
+                                (
+                                    spawnable.density(),
+                                    body_info.mass,
+                                    PointMass::HasGravity {
+                                        mass: body_info.mass,
+                                    },
+                                )
+                            } else {
+                                (0.001, 0.01, PointMass::AffectedByGravity)
+                            }
+                        } else {
+                            (spawnable.density(), 0.01, PointMass::AffectedByGravity)
+                        };
                         let mut entity = commands.entity(scene.entity());
+                        println!("{}", density);
+
                         entity.with_children(|child| {
                             let mut entity = child.spawn_bundle(BodyBundle::new(
                                 place_pos,
                                 Velocity::from_linear(place_pos - mouse_pos),
-                                0.1,
-                                body_info.mass.max(1.0),
-                                PointMass::HasGravity {
-                                    mass: body_info.mass,
-                                },
+                                density,
+                                physics_mass,
+                                point_mass,
                                 Color::WHITE,
                             ));
 
-                            if body_info.trail {
+                            if body_info.with_trail {
                                 entity.insert(Trail::new(20.0, 1));
                             }
                         });
@@ -238,31 +264,6 @@ fn place_body(
             0.0,
             Color::rgb(scale, 1.0 - scale, 0.0),
         )
-    }
-}
-
-fn sim_info_window(
-    mut egui_ctx: ResMut<EguiContext>,
-    mut scenes: ResMut<SceneCollection>,
-    mut scene: ResMut<LoadedScene>,
-    mut selected: Local<Option<usize>>,
-) {
-    if let Some(selected) = selected.as_mut() {
-        Window::new("Simulation").show(egui_ctx.ctx_mut(), |ui| {
-            ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
-                ComboBox::from_label("")
-                    .show_index(ui, selected, scenes.len(), |i| scenes[i].to_string());
-
-                if ui.button("New").clicked() {
-                    let selected_scene = scenes[*selected].clone();
-                    scene.load(selected_scene);
-                }
-            });
-
-            scenes[*selected].show_ui(ui);
-        });
-    } else {
-        *selected = scenes.iter().position(|s| s == scene.loaded());
     }
 }
 

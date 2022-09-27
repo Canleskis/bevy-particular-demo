@@ -1,9 +1,11 @@
 mod loaded_scene;
 mod scene_data;
+mod spawnable;
 mod systems;
 
 pub use loaded_scene::LoadedScene;
 pub use scene_data::{Empty, SceneData, SimulationScene};
+pub use spawnable::Spawnable;
 
 use bevy::app::{App, CoreStage, Plugin};
 
@@ -53,6 +55,7 @@ pub struct SimulationScenePlugin;
 impl Plugin for SimulationScenePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(LoadedScene::new(Empty {}))
-            .add_system_to_stage(CoreStage::PreUpdate, systems::scene_cleanup_and_reload);
+            .add_system_to_stage(CoreStage::PreUpdate, systems::scene_cleanup_and_reload)
+            .add_system(systems::show_ui);
     }
 }

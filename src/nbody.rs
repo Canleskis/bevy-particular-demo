@@ -1,16 +1,19 @@
 use crate::G;
-use bevy::prelude::*;
+use bevy::{math::Vec3Swizzles, prelude::*};
 use heron::{should_run, Acceleration};
 use particular::prelude::*;
 
+use bevy::math::Vec2 as Vect;
+
+#[derive(Particle)]
 pub struct Body {
-    position: Vec2,
+    position: Vect,
     mu: f32,
     entity: Entity,
 }
 
 impl Body {
-    pub fn new(position: Vec2, mu: f32, entity: Entity) -> Self {
+    pub fn new(position: Vect, mu: f32, entity: Entity) -> Self {
         Self {
             position,
             mu,
@@ -19,22 +22,10 @@ impl Body {
     }
 }
 
-impl Particle for Body {
-    type Vector = Vec2;
-
-    fn position(&self) -> Vec2 {
-        self.position
-    }
-
-    fn mu(&self) -> f32 {
-        self.mu
-    }
-}
-
 #[derive(Component)]
 pub enum PointMass {
     HasGravity { mass: f32 },
-    _AffectedByGravity,
+    AffectedByGravity,
 }
 
 pub struct ParticularPlugin;
@@ -63,14 +54,13 @@ fn sync_particle_set(
 ) {
     *particle_set = ParticleSet::new();
     query.for_each(|(entity, tranform, point_mass)| {
+        let position = tranform.translation().xy();
         match point_mass {
-            PointMass::HasGravity { mass } => particle_set.add_massive(Body::new(
-                tranform.translation().truncate(),
-                mass * G,
-                entity,
-            )),
-            PointMass::_AffectedByGravity => {
-                particle_set.add_massless(Body::new(tranform.translation().truncate(), 0.0, entity))
+            PointMass::HasGravity { mass } => {
+                particle_set.add_massive(Body::new(position, mass * G, entity))
+            }
+            PointMass::AffectedByGravity => {
+                particle_set.add_massless(Body::new(position, 0.0, entity))
             }
         };
     })

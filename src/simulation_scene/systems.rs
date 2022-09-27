@@ -3,12 +3,15 @@ use bevy::{
     ecs::{
         change_detection::DetectChanges,
         schedule::ShouldRun,
-        system::{Commands, Res, ResMut},
+        system::{Commands, Local, Res, ResMut},
     },
     hierarchy::DespawnRecursiveExt,
     scene::SceneBundle,
 };
+use bevy_egui::egui;
 use bevy_prototype_debug_lines::DebugLines;
+
+use super::SceneCollection;
 
 // Cannot use this as run criteria as changes done to `LoadedScene` in systems with this run criteria are also detected.
 pub fn _scene_changed(scene: Res<LoadedScene>) -> ShouldRun {
@@ -21,8 +24,8 @@ pub fn _scene_changed(scene: Res<LoadedScene>) -> ShouldRun {
 
 pub fn scene_cleanup_and_reload(
     mut commands: Commands,
-    mut scene: ResMut<LoadedScene>,
     mut lines: ResMut<DebugLines>,
+    mut scene: ResMut<LoadedScene>,
 ) {
     if scene.is_changed() {
         *lines = DebugLines::default();
@@ -38,5 +41,30 @@ pub fn scene_cleanup_and_reload(
         };
 
         scene.instance(entity_commands);
+    }
+}
+
+pub fn show_ui(
+    mut egui_ctx: ResMut<bevy_egui::EguiContext>,
+    mut scenes: ResMut<SceneCollection>,
+    mut scene: ResMut<LoadedScene>,
+    mut selected: Local<Option<usize>>,
+) {
+    if let Some(selected) = selected.as_mut() {
+        egui::Window::new("Simulation").show(egui_ctx.ctx_mut(), |ui| {
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                egui::ComboBox::from_label("")
+                    .show_index(ui, selected, scenes.len(), |i| scenes[i].to_string());
+
+                if ui.button("New").clicked() {
+                    let selected_scene = scenes[*selected].clone();
+                    scene.load(selected_scene);
+                }
+            });
+
+            scenes[*selected].show_ui(ui);
+        });
+    } else {
+        *selected = scenes.iter().position(|s| s == scene.loaded());
     }
 }

@@ -3,6 +3,8 @@ use std::fmt::Display;
 use bevy::ecs::system::EntityCommands;
 use bevy_egui::egui::Ui;
 
+use super::Spawnable;
+
 pub type SimulationScene = Box<dyn SceneData + Send + Sync>;
 
 pub trait SceneDataClone {
@@ -20,7 +22,7 @@ pub trait SceneData: SceneDataClone + Display {
 
     fn show_ui(&mut self, ui: &mut Ui);
 
-    fn max_spawnable_mass(&self) -> f32;
+    fn spawnable(&self) -> Spawnable;
 }
 
 impl Clone for SimulationScene {
@@ -49,7 +51,11 @@ impl SceneData for Empty {
 
     fn show_ui(&mut self, _: &mut Ui) {}
 
-    fn max_spawnable_mass(&self) -> f32 {
-        100.0
+    fn spawnable(&self) -> Spawnable {
+        Spawnable::Massive {
+            min_mass: 1.0,
+            max_mass: 100.0,
+            density: 0.1,
+        }
     }
 }

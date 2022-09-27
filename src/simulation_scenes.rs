@@ -3,12 +3,17 @@ use std::{
     fmt::Display,
 };
 
-use bevy::{ecs::system::EntityCommands, prelude::*};
-use bevy_egui::egui::{Slider, Ui};
-use heron::prelude::*;
-use rand::prelude::*;
+use bevy::{
+    ecs::system::EntityCommands,
+    prelude::{BuildChildren, Color, Name, Vec3},
+};
+use bevy_egui::egui::{self, Slider, Ui};
+use heron::Velocity;
+use rand::{thread_rng, Rng};
 
-use crate::{nbody::PointMass, trails::Trail, BodyBundle, SceneData, G};
+use crate::{
+    nbody::PointMass, simulation_scene::Spawnable, trails::Trail, BodyBundle, SceneData, G,
+};
 
 #[derive(Clone)]
 pub struct Orbits {
@@ -16,8 +21,10 @@ pub struct Orbits {
     main_density: f32,
     bodies_count: usize,
     bodies_density: f32,
-    bodies_range_pos: f32,
-    bodies_range_mass: f32,
+    bodies_max_pos: f32,
+    bodies_min_mass: f32,
+    bodies_max_mass: f32,
+    bodies_with_mass: bool,
 }
 
 impl Default for Orbits {
@@ -27,8 +34,10 @@ impl Default for Orbits {
             main_density: 20.0,
             bodies_count: 1000,
             bodies_density: 0.1,
-            bodies_range_pos: 1000.0,
-            bodies_range_mass: 10.0,
+            bodies_max_pos: 1000.0,
+            bodies_min_mass: 1.0,
+            bodies_max_mass: 10.0,
+            bodies_with_mass: true,
         }
     }
 }
@@ -39,7 +48,7 @@ impl Orbits {
     }
 
     fn min_spawnable_position(&self) -> f32 {
-        ((self.bodies_count as f32).sqrt() * self.bodies_range_mass).max(self.main_radius() * 4.0)
+        ((self.bodies_count as f32).sqrt() * self.bodies_max_mass).max(self.main_radius() * 4.0)
     }
 }
 
@@ -66,16 +75,25 @@ impl SceneData for Orbits {
             ));
 
             let min_radius = 2.0 * self.main_radius();
-            let min_p_sqrt =
-                min_radius * min_radius / (self.bodies_range_pos * self.bodies_range_pos);
+            let min_p_sqrt = min_radius * min_radius / (self.bodies_max_pos * self.bodies_max_pos);
 
             for i in 0..self.bodies_count {
-                let radius = self.bodies_range_pos * rng.gen_range(min_p_sqrt..=1.0).sqrt();
+                let radius = self.bodies_max_pos * rng.gen_range(min_p_sqrt..=1.0).sqrt();
                 let theta = rng.gen_range(0.0..=TAU);
 
                 let position = Vec3::new(radius * theta.cos(), radius * theta.sin(), 0.0);
 
-                let mass = rng.gen_range(0.0..=self.bodies_range_mass);
+                let mass = rng.gen_range(1.0..=self.bodies_max_mass);
+
+                let (density, physics_mass, point_mass) = if self.bodies_with_mass {
+                    (self.bodies_density, mass, PointMass::HasGravity { mass })
+                } else {
+                    (
+                        self.bodies_density / 100.0,
+                        self.bodies_min_mass / 100.0,
+                        PointMass::AffectedByGravity,
+                    )
+                };
 
                 let direction = position - Vec3::ZERO;
                 let distance = direction.length_squared();
@@ -90,9 +108,9 @@ impl SceneData for Orbits {
                     .spawn_bundle(BodyBundle::new(
                         position,
                         Velocity::from_linear(velvec),
-                        self.bodies_density,
-                        mass.max(1.0),
-                        PointMass::HasGravity { mass },
+                        density,
+                        physics_mass,
+                        point_mass,
                         Color::rgb(r, g, b),
                     ))
                     .insert(Name::new(format!("Particle {}", i)));
@@ -118,36 +136,52 @@ impl SceneData for Orbits {
         {
             ui.add(
                 Slider::new(&mut self.bodies_count, 1..=5000)
-                    .text("Body count")
+                    .text(" Body count")
                     .logarithmic(true),
             );
 
             let min_pos = self.min_spawnable_position();
             ui.add(
-                Slider::new(&mut self.bodies_range_pos, min_pos..=10000.0)
-                    .text("Position range")
+                Slider::new(&mut self.bodies_max_pos, min_pos..=10000.0)
+                    .text(" Position range")
                     .logarithmic(true)
                     .integer(),
             );
 
-            let max_mass = self.max_spawnable_mass();
-            ui.add(Slider::new(&mut self.bodies_range_mass, 0.0..=max_mass).text("Mass range"));
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                let (min_mass, max_mass) =
+                    (self.bodies_min_mass, self.spawnable().max_mass().unwrap());
+                ui.add_enabled(
+                    self.bodies_with_mass,
+                    Slider::new(&mut self.bodies_max_mass, min_mass..=max_mass),
+                );
+
+                ui.toggle_value(&mut self.bodies_with_mass, "Mass range");
+            });
         }
     }
 
-    fn max_spawnable_mass(&self) -> f32 {
-        self.main_mass / 5E3
+    fn spawnable(&self) -> Spawnable {
+        Spawnable::Massive {
+            min_mass: 1.0,
+            max_mass: self.main_mass / 5E3,
+            density: 0.1,
+        }
     }
 }
 
 #[derive(Clone)]
 pub struct Figure8 {
     radius: f32,
+    mass: f32,
 }
 
 impl Default for Figure8 {
     fn default() -> Self {
-        Self { radius: 20.0 }
+        Self {
+            radius: 30.0,
+            mass: 1E5,
+        }
     }
 }
 
@@ -159,8 +193,8 @@ impl Display for Figure8 {
 
 impl SceneData for Figure8 {
     fn instance(&self, mut scene_commands: EntityCommands) {
-        let mass: f32 = 1E5;
-        let density = mass / (self.radius.powi(2) * PI);
+        let mass = self.mass;
+        let density = 0.5 * mass / (self.radius.powi(2) * PI);
         let distance = (G * mass).cbrt();
 
         let pos1 = Vec3::new(-0.970_004_4, 0.243_087_53, 0.0) * distance;
@@ -214,19 +248,25 @@ impl SceneData for Figure8 {
         );
     }
 
-    fn max_spawnable_mass(&self) -> f32 {
-        0.0
+    fn spawnable(&self) -> Spawnable {
+        Spawnable::Massless {
+            density: 3E-7 * self.mass / (self.radius * self.radius * PI),
+        }
     }
 }
 
 #[derive(Clone)]
 pub struct TernaryOrbit {
     radius: f32,
+    mass: f32,
 }
 
 impl Default for TernaryOrbit {
     fn default() -> Self {
-        Self { radius: 20.0 }
+        Self {
+            radius: 20.0,
+            mass: 1E5,
+        }
     }
 }
 
@@ -238,7 +278,7 @@ impl Display for TernaryOrbit {
 
 impl SceneData for TernaryOrbit {
     fn instance(&self, mut scene_commands: EntityCommands) {
-        let mass: f32 = 1E5;
+        let mass: f32 = self.mass;
         let density = mass / (self.radius.powi(2) * PI);
         let distance = (G * mass).cbrt();
 
@@ -295,19 +335,23 @@ impl SceneData for TernaryOrbit {
         );
     }
 
-    fn max_spawnable_mass(&self) -> f32 {
-        0.0
+    fn spawnable(&self) -> Spawnable {
+        Spawnable::Massless { density: 1E-4 }
     }
 }
 
 #[derive(Clone)]
 pub struct DoubleOval {
     radius: f32,
+    mass: f32,
 }
 
 impl Default for DoubleOval {
     fn default() -> Self {
-        Self { radius: 20.0 }
+        Self {
+            radius: 20.0,
+            mass: 1E5,
+        }
     }
 }
 
@@ -319,7 +363,7 @@ impl Display for DoubleOval {
 
 impl SceneData for DoubleOval {
     fn instance(&self, mut scene_commands: EntityCommands) {
-        let mass: f32 = 1E5;
+        let mass: f32 = self.mass;
         let density = mass / (self.radius.powi(2) * PI);
         let distance = (G * mass).cbrt();
 
@@ -376,7 +420,7 @@ impl SceneData for DoubleOval {
         );
     }
 
-    fn max_spawnable_mass(&self) -> f32 {
-        0.0
+    fn spawnable(&self) -> Spawnable {
+        Spawnable::Massless { density: 1E-4 }
     }
 }
