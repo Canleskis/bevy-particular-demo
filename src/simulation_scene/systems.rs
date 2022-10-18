@@ -6,6 +6,7 @@ use bevy::{
         system::{Commands, Local, Res, ResMut},
     },
     hierarchy::DespawnRecursiveExt,
+    prelude::AssetServer,
     scene::SceneBundle,
 };
 use bevy_egui::egui;
@@ -26,6 +27,7 @@ pub fn scene_cleanup_and_reload(
     mut commands: Commands,
     mut lines: ResMut<DebugLines>,
     mut scene: ResMut<LoadedScene>,
+    asset_server: Res<AssetServer>,
 ) {
     if scene.is_changed() {
         *lines = DebugLines::default();
@@ -40,7 +42,7 @@ pub fn scene_cleanup_and_reload(
             commands
         };
 
-        scene.instance(entity_commands);
+        scene.instance(entity_commands, asset_server);
     }
 }
 

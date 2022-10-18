@@ -9,20 +9,16 @@ edition = "2021"
 bevy = "0.8.1"
 bevy_framepace = "0.7.0"
 heron = { version = "4.0.0", features = ["2d"] }
-bevy-inspector-egui = "0.12.1"
-bevy_prototype_lyon = "0.6.0"
+bevy-inspector-egui = "0.13.0"
 rand = "0.8.5"
 bevy_prototype_debug_lines = "0.8"
-rayon = "1.5.3"
-itertools = "0.10.3"
 bevy_pancam = { version = "0.6.0", features = ["bevy_egui"] }
-bevy_mouse_tracking_plugin = "0.3.1"
+bevy_mouse_tracking_plugin = "0.4.0"
 bevy_egui = "0.16"
-particular = "0.2.0"
-# particular = { path = "C:/Dev/rust/particular-main", features = ["2d"] }
+particular = { path = "D:/Dev/rust/particular-main" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-particular = { version = "0.2.0", features = ["parallel"] }
+particular = { path = "D:/Dev/rust/particular-main", features = ["parallel"] }
 
 
 [profile.dev]

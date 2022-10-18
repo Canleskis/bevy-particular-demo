@@ -21,12 +21,9 @@ use bevy_egui::{
     egui::{Slider, Window},
     EguiContext, EguiPlugin,
 };
-use bevy_mouse_tracking_plugin::{MousePosPlugin, MousePosWorld};
+use bevy_mouse_tracking_plugin::{prelude::*, MainCamera, MousePosWorld};
 use bevy_pancam::{PanCam, PanCamPlugin};
 use bevy_prototype_debug_lines::DebugLines;
-use bevy_prototype_lyon::entity::ShapeBundle;
-use bevy_prototype_lyon::prelude::*;
-use bevy_prototype_lyon::shapes::Circle;
 use heron::{prelude::*, PhysicsSteps};
 
 const G: f32 = 1000.0;
@@ -49,10 +46,9 @@ fn main() {
             ..default()
         })
         .add_plugin(FrameTimeDiagnosticsPlugin)
-        .add_plugin(ShapePlugin)
         .add_plugin(EguiPlugin)
         .add_plugin(PanCamPlugin)
-        .add_plugin(MousePosPlugin::SingleCamera)
+        .add_plugin(MousePosPlugin)
         .add_plugin(PhysicsPlugin::default())
         .add_plugin(TrailsPlugin)
         .add_plugin(ParticularPlugin)
@@ -84,6 +80,8 @@ fn main() {
 fn spawn_camera(mut commands: Commands) {
     commands
         .spawn_bundle(Camera2dBundle::default())
+        .add_world_tracking()
+        .insert(MainCamera)
         .insert(PanCam {
             grab_buttons: vec![MouseButton::Right, MouseButton::Middle],
             ..default()
@@ -208,6 +206,7 @@ fn place_body(
     mut body_info: ResMut<BodyInfo>,
     mouse_pos: Res<MousePosWorld>,
     scene: Res<LoadedScene>,
+    asset_server: Res<AssetServer>,
 ) {
     let mouse_pos = mouse_pos.truncate().extend(0.0);
 
@@ -244,6 +243,7 @@ fn place_body(
                                 physics_mass,
                                 point_mass,
                                 Color::WHITE,
+                                &asset_server,
                             ));
 
                             if body_info.with_trail {
@@ -270,7 +270,7 @@ fn place_body(
 #[derive(Bundle)]
 struct BodyBundle {
     #[bundle]
-    shape_bundle: ShapeBundle,
+    shape_bundle: SpriteBundle,
     collider: CollisionShape,
     material: PhysicMaterial,
     rigidbody: RigidBody,
@@ -287,17 +287,20 @@ impl BodyBundle {
         mass: f32,
         point_mass: PointMass,
         color: Color,
+        asset_server: &Res<AssetServer>,
     ) -> Self {
         let radius = (mass / (density * PI)).sqrt();
         Self {
-            shape_bundle: GeometryBuilder::build_as(
-                &Circle {
-                    radius,
-                    center: Vec2::ZERO,
+            shape_bundle: SpriteBundle {
+                transform: Transform::from_translation(position),
+                texture: asset_server.load("sprites/circle-sprite-300.png"),
+                sprite: Sprite {
+                    color,
+                    custom_size: Some(Vec2::splat(radius * 2.0)),
+                    ..default()
                 },
-                DrawMode::Fill(FillMode::color(color)),
-                Transform::from_translation(position),
-            ),
+                ..default()
+            },
             collider: CollisionShape::Sphere { radius },
             material: PhysicMaterial {
                 restitution: 0.0,

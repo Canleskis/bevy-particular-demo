@@ -1,5 +1,11 @@
 use crate::{SceneData, SimulationScene};
-use bevy::ecs::{entity::Entity, system::EntityCommands};
+use bevy::{
+    ecs::{
+        entity::Entity,
+        system::{EntityCommands, Res},
+    },
+    prelude::AssetServer,
+};
 
 use crate::Spawnable;
 
@@ -44,8 +50,8 @@ impl LoadedScene {
         self.entity
     }
 
-    pub fn instance(&self, scene_commands: EntityCommands) {
-        self.scene.instance(scene_commands)
+    pub fn instance(&self, scene_commands: EntityCommands, asset_server: Res<AssetServer>) {
+        self.scene.instance(scene_commands, asset_server)
     }
 
     pub fn spawnable(&self) -> Spawnable {

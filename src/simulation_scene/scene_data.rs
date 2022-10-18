@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use bevy::ecs::system::EntityCommands;
+use bevy::{
+    ecs::system::{EntityCommands, Res},
+    prelude::AssetServer,
+};
 use bevy_egui::egui::Ui;
 
 use super::Spawnable;
@@ -18,7 +21,7 @@ impl<T: 'static + SceneData + Send + Sync + Clone> SceneDataClone for T {
 }
 
 pub trait SceneData: SceneDataClone + Display {
-    fn instance(&self, scene_commands: EntityCommands);
+    fn instance(&self, scene_commands: EntityCommands, asset_server: Res<AssetServer>);
 
     fn show_ui(&mut self, ui: &mut Ui);
 
@@ -47,7 +50,7 @@ impl Display for Empty {
 }
 
 impl SceneData for Empty {
-    fn instance(&self, _: EntityCommands) {}
+    fn instance(&self, _: EntityCommands, _: Res<AssetServer>) {}
 
     fn show_ui(&mut self, _: &mut Ui) {}
 

@@ -4,8 +4,8 @@ use std::{
 };
 
 use bevy::{
-    ecs::system::EntityCommands,
-    prelude::{BuildChildren, Color, Name, Vec3},
+    ecs::system::{EntityCommands, Res},
+    prelude::{AssetServer, BuildChildren, Color, Name, Vec3},
 };
 use bevy_egui::egui::{self, Slider, Ui};
 use heron::Velocity;
@@ -59,7 +59,7 @@ impl Display for Orbits {
 }
 
 impl SceneData for Orbits {
-    fn instance(&self, mut scene_commands: EntityCommands) {
+    fn instance(&self, mut scene_commands: EntityCommands, asset_server: Res<AssetServer>) {
         let mut rng = thread_rng();
 
         scene_commands.with_children(|child| {
@@ -72,6 +72,7 @@ impl SceneData for Orbits {
                     mass: self.main_mass,
                 },
                 Color::WHITE,
+                &asset_server,
             ));
 
             let min_radius = 2.0 * self.main_radius();
@@ -112,6 +113,7 @@ impl SceneData for Orbits {
                         physics_mass,
                         point_mass,
                         Color::rgb(r, g, b),
+                        &asset_server,
                     ))
                     .insert(Name::new(format!("Particle {}", i)));
             }
@@ -192,7 +194,7 @@ impl Display for Figure8 {
 }
 
 impl SceneData for Figure8 {
-    fn instance(&self, mut scene_commands: EntityCommands) {
+    fn instance(&self, mut scene_commands: EntityCommands, asset_server: Res<AssetServer>) {
         let mass = self.mass;
         let density = 0.5 * mass / (self.radius.powi(2) * PI);
         let distance = (G * mass).cbrt();
@@ -212,6 +214,7 @@ impl SceneData for Figure8 {
                     mass,
                     PointMass::HasGravity { mass },
                     Color::WHITE,
+                    &asset_server,
                 ))
                 .insert(Trail::new(15.0, 1));
 
@@ -223,6 +226,7 @@ impl SceneData for Figure8 {
                     mass,
                     PointMass::HasGravity { mass },
                     Color::WHITE,
+                    &asset_server,
                 ))
                 .insert(Trail::new(15.0, 1));
 
@@ -234,6 +238,7 @@ impl SceneData for Figure8 {
                     mass,
                     PointMass::HasGravity { mass },
                     Color::WHITE,
+                    &asset_server,
                 ))
                 .insert(Trail::new(15.0, 1));
         });
@@ -277,7 +282,7 @@ impl Display for TernaryOrbit {
 }
 
 impl SceneData for TernaryOrbit {
-    fn instance(&self, mut scene_commands: EntityCommands) {
+    fn instance(&self, mut scene_commands: EntityCommands, asset_server: Res<AssetServer>) {
         let mass: f32 = self.mass;
         let density = mass / (self.radius.powi(2) * PI);
         let distance = (G * mass).cbrt();
@@ -299,6 +304,7 @@ impl SceneData for TernaryOrbit {
                     mass,
                     PointMass::HasGravity { mass },
                     Color::WHITE,
+                    &asset_server,
                 ))
                 .insert(Trail::new(15.0, 1));
 
@@ -310,6 +316,7 @@ impl SceneData for TernaryOrbit {
                     mass,
                     PointMass::HasGravity { mass },
                     Color::WHITE,
+                    &asset_server,
                 ))
                 .insert(Trail::new(15.0, 1));
 
@@ -321,6 +328,7 @@ impl SceneData for TernaryOrbit {
                     mass,
                     PointMass::HasGravity { mass },
                     Color::WHITE,
+                    &asset_server,
                 ))
                 .insert(Trail::new(15.0, 1));
         });
@@ -362,7 +370,7 @@ impl Display for DoubleOval {
 }
 
 impl SceneData for DoubleOval {
-    fn instance(&self, mut scene_commands: EntityCommands) {
+    fn instance(&self, mut scene_commands: EntityCommands, asset_server: Res<AssetServer>) {
         let mass: f32 = self.mass;
         let density = mass / (self.radius.powi(2) * PI);
         let distance = (G * mass).cbrt();
@@ -384,6 +392,7 @@ impl SceneData for DoubleOval {
                     mass,
                     PointMass::HasGravity { mass },
                     Color::WHITE,
+                    &asset_server,
                 ))
                 .insert(Trail::new(15.0, 1));
 
@@ -395,6 +404,7 @@ impl SceneData for DoubleOval {
                     mass,
                     PointMass::HasGravity { mass },
                     Color::WHITE,
+                    &asset_server,
                 ))
                 .insert(Trail::new(15.0, 1));
 
@@ -406,6 +416,7 @@ impl SceneData for DoubleOval {
                     mass,
                     PointMass::HasGravity { mass },
                     Color::WHITE,
+                    &asset_server,
                 ))
                 .insert(Trail::new(15.0, 1));
         });

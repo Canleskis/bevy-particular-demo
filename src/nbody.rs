@@ -1,19 +1,19 @@
 use crate::G;
-use bevy::{math::Vec3Swizzles, prelude::*};
+
+use bevy::math::Vec3;
+use bevy::prelude::*;
 use heron::{should_run, Acceleration};
 use particular::prelude::*;
 
-use bevy::math::Vec2 as Vect;
-
-#[derive(Particle)]
+#[particle(3)]
 pub struct Body {
-    position: Vect,
+    position: Vec3,
     mu: f32,
     entity: Entity,
 }
 
 impl Body {
-    pub fn new(position: Vect, mu: f32, entity: Entity) -> Self {
+    pub fn new(position: Vec3, mu: f32, entity: Entity) -> Self {
         Self {
             position,
             mu,
@@ -54,7 +54,7 @@ fn sync_particle_set(
 ) {
     *particle_set = ParticleSet::new();
     query.for_each(|(entity, tranform, point_mass)| {
-        let position = tranform.translation().xy();
+        let position = tranform.translation();
         match point_mass {
             PointMass::HasGravity { mass } => {
                 particle_set.add_massive(Body::new(position, mass * G, entity))
@@ -70,9 +70,9 @@ fn accelerate_particles(
     mut particle_set: ResMut<ParticleSet<Body>>,
     mut query: Query<&mut Acceleration, With<PointMass>>,
 ) {
-    for (body, gravity) in particle_set.result() {
+    for (gravity, body) in particle_set.result() {
         if let Ok(mut acceleration) = query.get_mut(body.entity) {
-            acceleration.linear = gravity.extend(0.0);
+            acceleration.linear = gravity;
         }
     }
 }
