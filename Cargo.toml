@@ -18,7 +18,7 @@ bevy_egui = "0.16"
 particular = "0.3.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-particular = { path = "D:/Dev/rust/particular-main", features = ["parallel"] }
+particular = { version = "0.3.0", features = ["parallel"] }
 
 
 [profile.dev]
