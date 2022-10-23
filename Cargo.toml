@@ -15,7 +15,7 @@ bevy_prototype_debug_lines = "0.8"
 bevy_pancam = { version = "0.6.0", features = ["bevy_egui"] }
 bevy_mouse_tracking_plugin = "0.4.0"
 bevy_egui = "0.16"
-particular = { path = "D:/Dev/rust/particular-main" }
+particular = "0.3.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 particular = { path = "D:/Dev/rust/particular-main", features = ["parallel"] }
